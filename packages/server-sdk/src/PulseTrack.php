@@ -18,7 +18,7 @@ class PulseTrack
             );
         }
 
-        if (empty($this->config['project_key'])) {
+        if (empty($this->config['public_key'])) {
             throw new InvalidArgumentException(
                 'PulseTrack project key is required.'
             );
@@ -50,7 +50,7 @@ class PulseTrack
         $endpoint = rtrim($this->config['endpoint'], '/');
 
         $payload = [
-            'project_key' => $this->config['project_key'],
+            'public_key' => $this->config['public_key'],
             'event_id' => (string) \Illuminate\Support\Str::uuid(),
             'event_name' => $eventName,
             'anonymous_id' => $options['anonymous_id']

@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EventIngestionTest extends TestCase
@@ -14,7 +15,7 @@ class EventIngestionTest extends TestCase
     use RefreshDatabase;
 
     private const PUBLIC_KEY = 'pk_test_project';
-    private const SERVER_KEY = 'sk_test_server_secret';
+    private const SERVER_KEY = 'sk_test_ingestion_123456';
 
     protected function setUp(): void
     {
@@ -31,16 +32,15 @@ class EventIngestionTest extends TestCase
             'admin_id' => $admin->id,
             'name' => 'Test Project',
             'public_key' => self::PUBLIC_KEY,
-            'server_key_hash' => hash('sha256', self::SERVER_KEY),
+            'server_key_hash' => self::SERVER_KEY,
         ]);
     }
-
 
     private function payload(): array
     {
         return [
-            'project_key' => self::PUBLIC_KEY,
-            'event_id' => '123e4567-e89b-42d3-a456-426614174000',
+            'public_key' => self::PUBLIC_KEY,
+            'event_id' => (string) Str::uuid(),
             'event_name' => 'test_event',
             'anonymous_id' => 'visitor-test',
             'session_id' => 'session-test',
@@ -67,8 +67,7 @@ class EventIngestionTest extends TestCase
 
     public function test_server_event_is_accepted_with_valid_server_key(): void
     {
-        $response = $this
-            ->withToken(self::SERVER_KEY)
+        $response = $this->withToken(self::SERVER_KEY)
             ->postJson('/api/v1/events', $this->payload());
 
         $response->assertStatus(202);
@@ -81,13 +80,40 @@ class EventIngestionTest extends TestCase
 
     public function test_invalid_server_key_is_rejected(): void
     {
-        $response = $this
-            ->withToken('sk_invalid_key')
+        $response = $this->withToken('sk_invalid_ingestion_key')
             ->postJson('/api/v1/events', $this->payload());
 
         $response->assertUnauthorized();
 
         $this->assertDatabaseCount('events', 0);
+    }
+
+    public function test_server_event_without_bearer_token_is_browser_event(): void
+    {
+        $response = $this->postJson(
+            '/api/v1/events',
+            $this->payload()
+        );
+
+        $response->assertStatus(202);
+
+        $this->assertDatabaseHas('events', [
+            'event_name' => 'test_event',
+            'source' => 'browser',
+        ]);
+    }
+
+    public function test_project_has_server_key_configured(): void
+    {
+        $project = Project::where(
+            'public_key',
+            self::PUBLIC_KEY
+        )->firstOrFail();
+
+        $this->assertNotEmpty(
+            $project->server_key_hash,
+            'Project must have a server key configured.'
+        );
     }
 
     public function test_repeated_event_id_does_not_create_duplicate(): void
@@ -109,7 +135,7 @@ class EventIngestionTest extends TestCase
 
         $response->assertUnprocessable()
             ->assertJsonValidationErrors([
-                'project_key',
+                'public_key',
                 'event_id',
                 'event_name',
                 'anonymous_id',
@@ -144,10 +170,10 @@ class EventIngestionTest extends TestCase
         $this->assertDatabaseCount('events', 0);
     }
 
-    public function test_unknown_project_key_is_rejected(): void
+    public function test_unknown_public_key_is_rejected(): void
     {
         $payload = $this->payload();
-        $payload['project_key'] = 'pk_unknown_project';
+        $payload['public_key'] = 'pk_unknown_project';
 
         $this->postJson('/api/v1/events', $payload)
             ->assertUnauthorized();

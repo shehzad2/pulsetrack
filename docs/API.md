@@ -35,7 +35,7 @@ Authorization: Bearer YOUR_SERVER_KEY
 
 ```json
 {
-  "project_key": "YOUR_PROJECT_PUBLIC_KEY",
+  "public_key": "YOUR_PROJECT_PUBLIC_KEY",
   "event_id": "550e8400-e29b-41d4-a716-446655440000",
   "event_name": "order_created",
   "anonymous_id": "visitor-123",
@@ -56,7 +56,7 @@ Authorization: Bearer YOUR_SERVER_KEY
 
 | Field | Rule |
 |---|---|
-| `project_key` | Required string, maximum 100 characters |
+| `public_key` | Required string, maximum 100 characters |
 | `event_id` | Required UUID |
 | `event_name` | Required string, maximum 100 characters; begins with a letter and contains only letters, numbers, and underscores |
 | `anonymous_id` | Required string, maximum 100 characters |
@@ -103,7 +103,7 @@ These endpoints require the API's admin authentication mechanism and an active a
 Pass the project key as a query parameter:
 
 ```text
-?project_key=YOUR_PROJECT_PUBLIC_KEY
+?public_key=YOUR_PROJECT_PUBLIC_KEY
 ```
 
 Optional date filters:
@@ -121,7 +121,7 @@ The `from` and `to` values must be valid dates. `to` must be on or after `from`.
 Example:
 
 ```text
-GET /api/v1/analytics/summary?project_key=YOUR_PROJECT_PUBLIC_KEY&from=2026-10-01&to=2026-10-18
+GET /api/v1/analytics/summary?public_key=YOUR_PROJECT_PUBLIC_KEY&from=2026-10-01&to=2026-10-18
 ```
 
 Response fields:

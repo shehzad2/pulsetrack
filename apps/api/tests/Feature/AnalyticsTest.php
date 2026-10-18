@@ -17,6 +17,7 @@ class AnalyticsTest extends TestCase
     private Project $project;
 
     private const PUBLIC_KEY = 'pk_analytics_test';
+    private const SERVER_KEY = 'sk_test_analytics_123456';
 
     protected function setUp(): void
     {
@@ -33,7 +34,7 @@ class AnalyticsTest extends TestCase
             'admin_id' => $this->admin->id,
             'name' => 'Analytics Test Project',
             'public_key' => self::PUBLIC_KEY,
-            'server_key_hash' => hash('sha256', 'test-server-key'),
+            'server_key_hash' => self::SERVER_KEY,
         ]);
     }
 
@@ -66,25 +67,86 @@ class AnalyticsTest extends TestCase
         ]);
     }
 
+    public function test_project_has_server_key_configured(): void
+    {
+        $this->assertNotEmpty(
+            $this->project->server_key_hash,
+            'Project must have a server key configured.'
+        );
+    }
+
+    public function test_server_key_authenticates_server_event(): void
+    {
+        $response = $this->withToken(self::SERVER_KEY)
+            ->postJson('/api/v1/events', [
+                'public_key' => self::PUBLIC_KEY,
+                'event_id' => (string) Str::uuid(),
+                'event_name' => 'server_test_event',
+                'anonymous_id' => 'server-test-visitor',
+                'session_id' => 'server-test-session',
+                'timestamp' => now()->toISOString(),
+                'properties' => ['test' => true],
+            ]);
+
+        $response->assertSuccessful();
+
+        $this->assertDatabaseHas('events', [
+            'project_id' => $this->project->id,
+            'event_name' => 'server_test_event',
+            'source' => 'server',
+        ]);
+    }
+
+    public function test_invalid_server_key_is_rejected(): void
+    {
+        $response = $this->withToken('sk_invalid_analytics_key')
+            ->postJson('/api/v1/events', [
+                'public_key' => self::PUBLIC_KEY,
+                'event_id' => (string) Str::uuid(),
+                'event_name' => 'invalid_server_test',
+                'anonymous_id' => 'server-test-visitor',
+                'session_id' => 'server-test-session',
+                'timestamp' => now()->toISOString(),
+                'properties' => [],
+            ]);
+
+        $response->assertUnauthorized();
+
+        $this->assertDatabaseMissing('events', [
+            'project_id' => $this->project->id,
+            'event_name' => 'invalid_server_test',
+        ]);
+    }
+
     public function test_summary_returns_expected_metrics(): void
     {
         $this->createEvent(
-            'page_view', 'visitor-1', 'session-1',
-            '2026-10-15 10:00:00', ['path' => '/']
+            'page_view',
+            'visitor-1',
+            'session-1',
+            '2026-10-15 10:00:00',
+            ['path' => '/']
         );
 
         $this->createEvent(
-            'page_view', 'visitor-1', 'session-1',
-            '2026-10-15 10:05:00', ['path' => '/products']
+            'page_view',
+            'visitor-1',
+            'session-1',
+            '2026-10-15 10:05:00',
+            ['path' => '/products']
         );
 
         $this->createEvent(
-            'add_to_cart', 'visitor-2', 'session-2',
+            'add_to_cart',
+            'visitor-2',
+            'session-2',
             '2026-10-15 11:00:00'
         );
 
         $this->withHeaders($this->headers())
-            ->getJson('/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY)
+            ->getJson(
+                '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
+            )
             ->assertOk()
             ->assertJson([
                 'total_events' => 3,
@@ -97,7 +159,7 @@ class AnalyticsTest extends TestCase
     public function test_summary_rejects_missing_token(): void
     {
         $this->getJson(
-            '/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY
+            '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
         )->assertUnauthorized();
     }
 
@@ -105,7 +167,7 @@ class AnalyticsTest extends TestCase
     {
         $this->withToken('invalid-token')
             ->getJson(
-                '/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY
+                '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
             )
             ->assertUnauthorized();
     }
@@ -113,25 +175,33 @@ class AnalyticsTest extends TestCase
     public function test_summary_rejects_unknown_project(): void
     {
         $this->withHeaders($this->headers())
-            ->getJson('/api/v1/analytics/summary?project_key=pk_unknown')
+            ->getJson(
+                '/api/v1/analytics/summary?public_key=pk_unknown'
+            )
             ->assertUnauthorized();
     }
 
     public function test_summary_supports_date_filters(): void
     {
         $this->createEvent(
-            'page_view', 'visitor-1', 'session-1',
-            '2026-10-10 10:00:00', ['path' => '/']
+            'page_view',
+            'visitor-1',
+            'session-1',
+            '2026-10-10 10:00:00',
+            ['path' => '/']
         );
 
         $this->createEvent(
-            'page_view', 'visitor-2', 'session-2',
-            '2026-10-15 10:00:00', ['path' => '/products']
+            'page_view',
+            'visitor-2',
+            'session-2',
+            '2026-10-15 10:00:00',
+            ['path' => '/products']
         );
 
         $this->withHeaders($this->headers())
             ->getJson(
-                '/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY
+                '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
                 . '&from=2026-10-14&to=2026-10-16'
             )
             ->assertOk()
@@ -147,7 +217,7 @@ class AnalyticsTest extends TestCase
     {
         $this->withHeaders($this->headers())
             ->getJson(
-                '/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY
+                '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
                 . '&from=2026-10-16&to=2026-10-10'
             )
             ->assertUnprocessable();
@@ -159,21 +229,29 @@ class AnalyticsTest extends TestCase
             'admin_id' => $this->admin->id,
             'name' => 'Other Project',
             'public_key' => 'pk_other_project',
-            'server_key_hash' => hash('sha256', 'other-test-key'),
+            'server_key_hash' => 'sk_test_other_project',
         ]);
 
         $this->createEvent(
-            'page_view', 'visitor-1', 'session-1',
+            'page_view',
+            'visitor-1',
+            'session-1',
             '2026-10-15 10:00:00'
         );
 
         $this->createEvent(
-            'page_view', 'visitor-2', 'session-2',
-            '2026-10-15 10:00:00', [], $otherProject
+            'page_view',
+            'visitor-2',
+            'session-2',
+            '2026-10-15 10:00:00',
+            [],
+            $otherProject
         );
 
         $this->withHeaders($this->headers())
-            ->getJson('/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY)
+            ->getJson(
+                '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
+            )
             ->assertOk()
             ->assertJson([
                 'total_events' => 1,
@@ -196,12 +274,12 @@ class AnalyticsTest extends TestCase
             'admin_id' => $otherAdmin->id,
             'name' => 'Other Admin Project',
             'public_key' => 'pk_other_admin_project',
-            'server_key_hash' => hash('sha256', 'other-secret'),
+            'server_key_hash' => 'sk_test_other_admin_project',
         ]);
 
         $this->withHeaders($this->headers())
             ->getJson(
-                '/api/v1/analytics/summary?project_key='
+                '/api/v1/analytics/summary?public_key='
                 . $otherProject->public_key
             )
             ->assertUnauthorized();
@@ -210,53 +288,80 @@ class AnalyticsTest extends TestCase
     public function test_popular_pages_returns_page_view_counts(): void
     {
         $this->createEvent(
-            'page_view', 'visitor-1', 'session-1',
-            '2026-10-15 10:00:00', ['path' => '/products']
+            'page_view',
+            'visitor-1',
+            'session-1',
+            '2026-10-15 10:00:00',
+            ['path' => '/products']
         );
 
         $this->createEvent(
-            'page_view', 'visitor-2', 'session-2',
-            '2026-10-15 11:00:00', ['path' => '/products']
+            'page_view',
+            'visitor-2',
+            'session-2',
+            '2026-10-15 11:00:00',
+            ['path' => '/products']
         );
 
         $this->createEvent(
-            'page_view', 'visitor-3', 'session-3',
-            '2026-10-15 12:00:00', ['path' => '/']
+            'page_view',
+            'visitor-3',
+            'session-3',
+            '2026-10-15 12:00:00',
+            ['path' => '/']
         );
 
         $this->withHeaders($this->headers())
             ->getJson(
-                '/api/v1/analytics/popular-pages?project_key=' . self::PUBLIC_KEY
+                '/api/v1/analytics/popular-pages?public_key=' . self::PUBLIC_KEY
             )
             ->assertOk()
-            ->assertJsonFragment(['path' => '/products', 'views' => 2])
-            ->assertJsonFragment(['path' => '/', 'views' => 1]);
+            ->assertJsonFragment([
+                'path' => '/products',
+                'views' => 2,
+            ])
+            ->assertJsonFragment([
+                'path' => '/',
+                'views' => 1,
+            ]);
     }
 
     public function test_event_trends_returns_event_counts(): void
     {
         $this->createEvent(
-            'page_view', 'visitor-1', 'session-1',
+            'page_view',
+            'visitor-1',
+            'session-1',
             '2026-10-15 10:00:00'
         );
 
         $this->createEvent(
-            'page_view', 'visitor-2', 'session-2',
+            'page_view',
+            'visitor-2',
+            'session-2',
             '2026-10-15 11:00:00'
         );
 
         $this->createEvent(
-            'add_to_cart', 'visitor-1', 'session-1',
+            'add_to_cart',
+            'visitor-1',
+            'session-1',
             '2026-10-15 12:00:00'
         );
 
         $this->withHeaders($this->headers())
             ->getJson(
-                '/api/v1/analytics/event-trends?project_key=' . self::PUBLIC_KEY
+                '/api/v1/analytics/event-trends?public_key=' . self::PUBLIC_KEY
             )
             ->assertOk()
-            ->assertJsonFragment(['event_name' => 'page_view', 'total' => 2])
-            ->assertJsonFragment(['event_name' => 'add_to_cart', 'total' => 1]);
+            ->assertJsonFragment([
+                'event_name' => 'page_view',
+                'total' => 2,
+            ])
+            ->assertJsonFragment([
+                'event_name' => 'add_to_cart',
+                'total' => 1,
+            ]);
     }
 
     public function test_inactive_admin_cannot_access_analytics(): void
@@ -264,7 +369,9 @@ class AnalyticsTest extends TestCase
         $this->admin->update(['is_active' => false]);
 
         $this->withHeaders($this->headers())
-            ->getJson('/api/v1/analytics/summary?project_key=' . self::PUBLIC_KEY)
+            ->getJson(
+                '/api/v1/analytics/summary?public_key=' . self::PUBLIC_KEY
+            )
             ->assertUnauthorized();
     }
 }

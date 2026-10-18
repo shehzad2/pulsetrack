@@ -5,8 +5,9 @@ import { useCart } from "../context/CartContext";
 import { useProducts } from "../hooks/useProducts";
 import { getAuthToken } from "../auth";
 import { analytics } from "../analytics";
+import { PULSETRACK_CONFIG } from "../config";
 
-const API_URL = "http://127.0.0.1:8000/api/v1";
+
 
 interface CreatedOrder {
   id: number;
@@ -115,27 +116,29 @@ export default function CheckoutPage() {
     try {
       const token = getAuthToken();
 
-      const response = await fetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          ...(token
-            ? { Authorization: `Bearer ${token}` }
-            : {}),
+     const response = await fetch(
+        `${PULSETRACK_CONFIG.endpoint}/api/v1/orders`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            public_key: PULSETRACK_CONFIG.projectKey,
+            customer_name: customerName.trim(),
+            phone: phone.trim(),
+            address: address.trim(),
+            city: city.trim(),
+            postal_code: postalCode.trim(),
+            items: items.map((product) => ({
+              product_id: product.id,
+              quantity: cart[product.id],
+            })),
+          }),
         },
-        body: JSON.stringify({
-          customer_name: customerName.trim(),
-          phone: phone.trim(),
-          address: address.trim(),
-          city: city.trim(),
-          postal_code: postalCode.trim(),
-          items: items.map((product) => ({
-            product_id: product.id,
-            quantity: cart[product.id],
-          })),
-        }),
-      });
+      );
 
       const result = (await response.json().catch(() => ({}))) as
         CreateOrderResponse;

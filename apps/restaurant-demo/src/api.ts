@@ -1,3 +1,5 @@
+import { PULSETRACK_CONFIG } from "./config";
+
 export interface Product {
   id: number;
   sku: string;
@@ -9,10 +11,15 @@ export interface Product {
   image_url: string | null;
 }
 
-const API_URL = "http://127.0.0.1:8000/api/v1";
-
 export async function getProducts(): Promise<Product[]> {
-  const response = await fetch(`${API_URL}/products`);
+  const response = await fetch(
+    `${PULSETRACK_CONFIG.endpoint}/api/v1/products`,
+    {
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to load products (${response.status})`);

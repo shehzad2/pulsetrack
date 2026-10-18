@@ -12,6 +12,7 @@ export interface Project {
   id: number;
   name: string;
   public_key: string;
+  server_key?: string;
   created_at: string;
 }
 
@@ -87,13 +88,13 @@ export function createProject(token: string, name: string) {
 
 export function getSummary(
   token: string,
-  projectKey: string,
+  publicKey: string,
   from: string,
   to: string,
 ) {
   return request<Summary>(
     `/analytics/summary?${new URLSearchParams({
-      project_key: projectKey,
+      public_key: publicKey,
       from,
       to,
     })}`,
@@ -103,13 +104,13 @@ export function getSummary(
 
 export function getPopularPages(
   token: string,
-  projectKey: string,
+  publicKey: string,
   from: string,
   to: string,
 ) {
   return request<{ pages: PopularPage[] }>(
     `/analytics/popular-pages?${new URLSearchParams({
-      project_key: projectKey,
+      public_key: publicKey,
       from,
       to,
     })}`,
@@ -119,13 +120,13 @@ export function getPopularPages(
 
 export function getEventTrends(
   token: string,
-  projectKey: string,
+  publicKey: string,
   from: string,
   to: string,
 ) {
   return request<{ trends: EventTrend[] }>(
     `/analytics/event-trends?${new URLSearchParams({
-      project_key: projectKey,
+      public_key: publicKey,
       from,
       to,
     })}`,

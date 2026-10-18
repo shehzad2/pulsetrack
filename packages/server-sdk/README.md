@@ -2,58 +2,127 @@
 
 The PulseTrack PHP Server SDK sends analytics events from Laravel applications to the PulseTrack API.
 
-Use server-side tracking for confirmed business events such as order creation. Keep server credentials on the server and never expose them to browser code.
+Use server-side tracking for confirmed business events such as order creation, subscription creation, and successful payments. Keep server credentials on the server and never expose them to browser code.
+
+## Features
+
+- Server-side custom event tracking
+- Laravel service-container integration
+- Bearer-token authentication using the project server key
+- Configurable API endpoint and HTTP timeout
+- Optional page-view middleware
+- Laravel HTTP client integration
 
 ## Requirements
 
-- PHP 8.2 or later.
-- Laravel components supported by the package: Illuminate Support and HTTP 11, 12, or 13.
-- A running PulseTrack API.
-- A PulseTrack project public key and server key.
+- PHP 8.2 or later
+- Composer
+- A Laravel application using compatible Illuminate components
+- A running PulseTrack API
+- A valid PulseTrack project public key and server key
+
+The package supports the Illuminate Support and HTTP components for versions 11, 12, and 13, subject to the constraints declared in `composer.json`.
 
 ## Installation
 
-For local development in the PulseTrack monorepo, the package is available at `packages/server-sdk`.
+### Install from the PulseTrack monorepo
 
-From the Laravel API directory:
+The PHP Server SDK is located at:
+
+```text
+packages/server-sdk/
+```
+
+For local development, configure the package as a Composer path repository in `apps/api/composer.json`.
+
+Add the following entry to the existing `repositories` array:
+
+```json
+{
+  "type": "path",
+  "url": "../../packages/server-sdk",
+  "options": {
+    "symlink": true
+  }
+}
+```
+
+Merge this entry into the existing configuration instead of replacing other repositories.
+
+Ensure the SDK package's `composer.json` declares the correct package name, such as `pulsetrack/server-sdk`, and a compatible development version or branch alias.
+
+Then install it:
 
 ```bash
 cd apps/api
-composer require pulsetrack/server-sdk:@dev
+composer require "pulsetrack/server-sdk:*@dev"
 ```
 
-The package uses Composer PSR-4 autoloading and Laravel package auto-discovery.
+Composer resolves the package from the local path repository.
 
-For applications outside this repository, publish the package to a Composer repository or configure a Composer path repository pointing to the package directory before installing it.
+If the package is already installed, use:
+
+```bash
+cd apps/api
+composer install
+```
+
+### Install in an external Laravel application
+
+For applications outside this repository, publish the package to an appropriate Composer repository or configure a Composer path repository that points to the SDK package directory.
+
+Then install it using the package name and version available from that repository.
 
 ## Configuration
 
-Set the following environment variables in your Laravel application's `.env` file:
+Configure the following environment variables in `apps/api/.env`:
 
 ```dotenv
 PULSETRACK_ENDPOINT=http://127.0.0.1:8000
-PULSETRACK_PROJECT_KEY=YOUR_PULSETTRACK_PUBLIC_KEY
-PULSETRACK_SERVER_KEY=YOUR_PULSETTRACK_SERVER_KEY
+PULSETRACK_PUBLIC_KEY=YOUR_PULSETRACK_PUBLIC_KEY
+PULSETRACK_SERVER_KEY=YOUR_PULSETRACK_SERVER_KEY
 PULSETRACK_TIMEOUT=5
 ```
 
-Use the deployed API URL in production. Keep `PULSETRACK_SERVER_KEY` private and do not commit real credentials to source control.
+Replace the example values with your actual project configuration.
 
-The package configuration is defined in `config/pulsetrack.php`. Its defaults are:
+| Setting | Purpose |
+|---|---|
+| `PULSETRACK_ENDPOINT` | Base URL of the PulseTrack API |
+| `PULSETRACK_PUBLIC_KEY` | Public key identifying the PulseTrack project |
+| `PULSETRACK_SERVER_KEY` | Secret bearer key used for server authentication |
+| `PULSETRACK_TIMEOUT` | HTTP request timeout in seconds |
 
-| Setting | Default | Purpose |
-|---|---|---|
-| `endpoint` | `http://127.0.0.1:8000` | PulseTrack API base URL |
-| `project_key` | Environment variable | Project public key |
-| `server_key` | Environment variable | Server authentication key |
-| `timeout` | `5` seconds | HTTP request timeout |
+For local development, the API endpoint may be `http://127.0.0.1:8000`. Use your deployed HTTPS API URL in production.
+
+The SDK configuration is defined in `config/pulsetrack.php`. Ensure it maps the environment variables to the configuration keys expected by the SDK:
+
+- `endpoint`
+- `public_key`
+- `server_key`
+- `timeout`
+
+After changing environment variables or configuration, clear Laravel's cached configuration:
+
+```bash
+cd apps/api
+php artisan optimize:clear
+```
+
+**Security:** Never commit real server keys to source control. Do not expose `PULSETRACK_SERVER_KEY` through frontend environment variables, browser JavaScript, HTML, or public repositories.
 
 ## Track an event
 
+Inject `PulseTrack` into a Laravel service or controller:
+
 ```php
+<?php
+
+namespace App\Services;
+
 use PulseTrack\ServerSdk\PulseTrack;
 
-class ExampleService
+class AnalyticsService
 {
     public function __construct(
         private PulseTrack $pulsetrack,
@@ -70,33 +139,53 @@ class ExampleService
 }
 ```
 
-The `track()` method accepts:
+The `track()` method accepts an event name and an optional associative array of properties. Additional options should be used only if supported by the installed SDK implementation.
 
-- `eventName`: required event name.
-- `properties`: optional associative array of event properties.
-- `options`: optional array for additional event options supported by the implementation.
-
-Event names must start with a letter and contain only letters, numbers, or underscores, up to 100 characters.
+Use meaningful event names and properties. Do not include passwords, access tokens, payment credentials, or other sensitive information in analytics events.
 
 ## Track a confirmed order
 
-Call the SDK after your application has successfully created an order:
+Send an order event after the order has been successfully persisted:
 
 ```php
-$this->pulsetrack->track('order_created', [
-    'order_id' => $order->id,
-    'order_number' => $order->order_number,
-    'total_amount' => (float) $order->total_amount,
-    'currency' => $order->currency,
-    'payment_method' => $order->payment_method,
-]);
+try {
+    $this->pulsetrack->track('order_created', [
+        'order_id' => (string) $order->id,
+        'order_number' => $order->order_number,
+        'total_amount' => (float) $order->total_amount,
+        'currency' => $order->currency,
+        'payment_method' => $order->payment_method,
+    ]);
+} catch (\Throwable $e) {
+    \Illuminate\Support\Facades\Log::warning(
+        'PulseTrack order event failed',
+        [
+            'order_id' => $order->id,
+            'error' => $e->getMessage(),
+        ]
+    );
+}
 ```
 
-Adjust the properties to match your application. Send this event only when the order has actually been created. For reliable checkout behavior, handle analytics failures separately so they do not unintentionally turn a successful order into a failed customer request.
+Adapt the properties to your application's order model.
+
+Keep analytics delivery separate from the main business operation when analytics failure should not interrupt a successfully created order. For reliable delivery across failures, consider an outbox or queued-event design.
+
+Use distinct event names for distinct business milestones. For example, `order_created` should not automatically mean that payment succeeded.
 
 ## Laravel dependency injection
 
-Laravel's service provider registers the `PulseTrack` class in the service container. You can inject it into a controller or service:
+The package provides the service provider:
+
+```php
+PulseTrack\ServerSdk\PulseTrackServiceProvider
+```
+
+It registers the `PulseTrack` client in Laravel's service container.
+
+Laravel package auto-discovery can register the provider if the package's Composer metadata enables it. If your application explicitly registers providers in `apps/api/bootstrap/providers.php`, ensure the provider is listed there.
+
+You can inject the SDK into controllers and services:
 
 ```php
 use PulseTrack\ServerSdk\PulseTrack;
@@ -106,32 +195,56 @@ public function __construct(
 ) {}
 ```
 
-The provider also registers the `pulsetrack` alias.
+The package also registers the `pulsetrack` alias, according to its current implementation.
 
 ## Page-view middleware
 
-The package includes `PulseTrack\ServerSdk\Http\Middleware\TrackPageViews`.
+The package includes:
 
-If you choose to register it in Laravel's web middleware stack, first review the middleware implementation and test its behavior in your environment. Avoid adding a second page-view source if the Browser SDK already tracks the same pages, as this can create duplicate events.
+```text
+src/Http/Middleware/TrackPageViews.php
+```
 
-## Authentication and transport
+This middleware can be registered in Laravel's web middleware stack if required.
+
+Review the middleware implementation and test it in your environment before enabling it. If the Browser SDK already tracks page views, enabling server-side page-view tracking on the same routes may create duplicate events.
+
+Choose the tracking source intentionally for each event type.
+
+## Authentication and event delivery
 
 The SDK sends events to:
 
-`POST /api/v1/events`
+```text
+POST /api/v1/events
+```
 
-It includes the project key in the JSON body and uses the server key as a bearer token. The API must validate that key against the project's stored server-key hash.
+The request includes the public project key in the JSON payload and the server key in the HTTP bearer authorization header.
 
-Do not put the server key in JavaScript, HTML, browser storage, public repositories, or client-visible environment variables. Rotate credentials that may have been exposed.
+The API uses the public key to identify the project and validates the server key before accepting a server-originated event. Accepted server events should be stored with:
+
+```text
+source = server
+```
+
+Browser events use the public project key without the server bearer key and are stored with:
+
+```text
+source = browser
+```
+
+The server key is a secret. Never put it in frontend code, browser storage, public repositories, or client-visible environment variables. Rotate any credential that may have been exposed.
 
 ## Error handling
 
-The SDK uses Laravel's HTTP client and throws for unsuccessful HTTP responses. Catch exceptions around analytics calls when analytics failure should not interrupt the main business operation:
+The SDK uses Laravel's HTTP client. According to its implementation, unsuccessful HTTP responses can throw exceptions.
+
+Catch exceptions around analytics calls when analytics failures must not interrupt the main business operation:
 
 ```php
 try {
     $this->pulsetrack->track('order_created', [
-        'order_id' => $order->id,
+        'order_id' => (string) $order->id,
     ]);
 } catch (\Throwable $e) {
     \Illuminate\Support\Facades\Log::warning(
@@ -146,32 +259,4 @@ try {
 
 Avoid logging credentials, authorization headers, or sensitive customer data.
 
-## Verify the installation
-
-From `apps/api`, clear Laravel's cached configuration if you changed environment variables:
-
-```bash
-php artisan optimize:clear
-```
-
-Then run a local test from Tinker:
-
-```bash
-php artisan tinker
-```
-
-Inside Tinker:
-
-```php
-app(\PulseTrack\ServerSdk\PulseTrack::class)
-    ->track('sdk_connection_test', ['test' => true]);
-```
-
-Verify that the event appears in the PulseTrack database or analytics dashboard. Do not paste server keys into chat or commit them in the README.
-
-## Package files
-
-- `src/PulseTrack.php` — event tracking client.
-- `src/PulseTrackServiceProvider.php` — Laravel service registration.
-- `src/Http/Middleware/TrackPageViews.php` — optional page-view middleware.
-- `config/pulsetrack.php` — SDK configuration.
+The SDK's event-delivery behavior should be verified against the installed implementation. Do

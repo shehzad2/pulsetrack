@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, X, ShieldCheck, Globe } from "lucide-react";
 import type { Project } from "../../../api";
 
 interface IntegrationModalProps {
@@ -32,11 +32,9 @@ export const analytics = new PulseTrack({
 
   const laravelInstall = "composer require pulsetrack/server-sdk";
 
-  const laravelGenerateKey = `php -r 'echo "sk_" . bin2hex(random_bytes(32)) . PHP_EOL;'`;
-
   const laravelEnv = `PULSETRACK_ENDPOINT=YOUR_API_ENDPOINT
-PULSETRACK_PROJECT_KEY=${project.public_key}
-PULSETRACK_SERVER_KEY=YOUR_GENERATED_SECRET_KEY
+PULSETRACK_PUBLIC_KEY=${project.public_key}
+PULSETRACK_SERVER_KEY=${project.server_key ?? "YOUR_SERVER_KEY"}
 PULSETRACK_TIMEOUT=5`;
 
   const laravelEvent = `use PulseTrack\\ServerSdk\\PulseTrack;
@@ -49,6 +47,7 @@ class OrderController
 
     public function store()
     {
+        // Call after the order has been successfully created.
         $this->pulsetrack->track('order_created', [
             'order_id' => 123,
             'total_amount' => 299,
@@ -107,9 +106,11 @@ class OrderController
     return (
       <section>
         <h3 style={{ fontSize: 15 }}>{title}</h3>
+
         <pre style={codeStyle}>
           <code>{code}</code>
         </pre>
+
         <button
           type="button"
           style={buttonStyle}
@@ -118,6 +119,7 @@ class OrderController
           {copied === label ? <Check size={16} /> : <Copy size={16} />}
           {copied === label ? "Copied" : "Copy code"}
         </button>
+
         {note && (
           <p style={{ color: "#8994aa", fontSize: 12, lineHeight: 1.6 }}>
             {note}
@@ -126,6 +128,8 @@ class OrderController
       </section>
     );
   }
+
+  const serverKeyAvailable = Boolean(project.server_key);
 
   return (
     <div
@@ -171,9 +175,11 @@ class OrderController
               <Check size={14} style={{ verticalAlign: "middle" }} /> PROJECT
               {" "}INTEGRATION
             </span>
+
             <h2 id="integration-title" style={{ margin: "10px 0 6px" }}>
               {project.name} integration
             </h2>
+
             <p style={{ margin: 0, color: "#8994aa", fontSize: 14 }}>
               Connect your application to PulseTrack analytics.
             </p>
@@ -190,8 +196,16 @@ class OrderController
         </header>
 
         <div style={{ padding: 24, display: "grid", gap: 24 }}>
+          {/* Public project key */}
           <section>
-            <h3 style={{ fontSize: 15 }}>Public project key</h3>
+            <h3 style={{ fontSize: 15 }}>
+              <Globe
+                size={16}
+                style={{ verticalAlign: "middle", marginRight: 8 }}
+              />
+              Public project key
+            </h3>
+
             <div
               style={{
                 display: "flex",
@@ -208,20 +222,28 @@ class OrderController
               <code style={{ overflowWrap: "anywhere" }}>
                 {project.public_key}
               </code>
+
               <button
                 type="button"
                 style={buttonStyle}
-                onClick={() => void copyText(project.public_key, "key")}
+                onClick={() => void copyText(project.public_key, "public-key")}
               >
-                {copied === "key" ? <Check size={16} /> : <Copy size={16} />}
-                {copied === "key" ? "Copied" : "Copy key"}
+                {copied === "public-key" ? (
+                  <Check size={16} />
+                ) : (
+                  <Copy size={16} />
+                )}
+                {copied === "public-key" ? "Copied" : "Copy key"}
               </button>
             </div>
+
             <p style={{ color: "#8994aa", fontSize: 12 }}>
-              This public key identifies your project. It is not a server secret.
+              Use this key in your browser SDK. It identifies your project
+              and is not a secret.
             </p>
           </section>
 
+          {/* SDK tabs */}
           <div
             role="tablist"
             aria-label="SDK type"
@@ -247,7 +269,8 @@ class OrderController
                   ...buttonStyle,
                   flex: 1,
                   background: sdkType === type ? "#fff" : "transparent",
-                  borderColor: sdkType === type ? "#dfe4ef" : "transparent",
+                  borderColor:
+                    sdkType === type ? "#dfe4ef" : "transparent",
                   color: sdkType === type ? "#5968e8" : "#69758d",
                 }}
               >
@@ -258,42 +281,22 @@ class OrderController
 
           {sdkType === "browser" ? (
             <>
-              <section>
-                <h3 style={{ fontSize: 15 }}>1. Install the SDK</h3>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    padding: 12,
-                    borderRadius: 10,
-                    background: "#f8f9fc",
-                  }}
-                >
-                  <code>{browserInstall}</code>
-                  <button
-                    type="button"
-                    style={buttonStyle}
-                    onClick={() =>
-                      void copyText(browserInstall, "browser-install")
-                    }
-                  >
-                    {copied === "browser-install" ? "Copied" : "Copy"}
-                  </button>
-                </div>
-              </section>
+              <CodeSection
+                title="1. Install the browser SDK"
+                code={browserInstall}
+                label="browser-install"
+                note="Run this command in your frontend application."
+              />
 
               <CodeSection
                 title="2. Initialize PulseTrack"
                 code={browserSetup}
                 label="browser-setup"
-                note="Replace YOUR_API_ENDPOINT with your actual API base URL."
+                note="Replace YOUR_API_ENDPOINT with your actual PulseTrack API URL."
               />
 
               <CodeSection
-                title="3. Track an event"
+                title="3. Track a browser event"
                 code={browserEvent}
                 label="browser-event"
               />
@@ -301,57 +304,131 @@ class OrderController
           ) : (
             <>
               <CodeSection
-                title="1. Install the Laravel SDK"
+                title="1. Install the Laravel Server SDK"
                 code={laravelInstall}
                 label="laravel-install"
-                note="Run this in your Laravel application's directory. For local development, use the configured Composer path repository."
+                note="Run this in your Laravel backend application."
               />
 
-              <CodeSection
-                title="2. Generate a server secret key"
-                code={laravelGenerateKey}
-                label="laravel-generate-key"
-                note="Run this PHP command in your terminal. Copy the generated sk_... value. Keep it private and do not put it in frontend code."
-              />
+              <section>
+                <h3 style={{ fontSize: 15 }}>
+                  <ShieldCheck
+                    size={17}
+                    style={{ verticalAlign: "middle", marginRight: 8 }}
+                  />
+                  2. Server secret key
+                </h3>
+
+                {serverKeyAvailable ? (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: 12,
+                        border: "1px solid #f3dfad",
+                        borderRadius: 10,
+                        background: "#fff8e8",
+                      }}
+                    >
+                      <code style={{ overflowWrap: "anywhere" }}>
+                        {project.server_key}
+                      </code>
+
+                      <button
+                        type="button"
+                        style={buttonStyle}
+                        onClick={() =>
+                          void copyText(
+                            project.server_key!,
+                            "server-key",
+                          )
+                        }
+                      >
+                        {copied === "server-key" ? (
+                          <Check size={16} />
+                        ) : (
+                          <Copy size={16} />
+                        )}
+                        {copied === "server-key" ? "Copied" : "Copy secret"}
+                      </button>
+                    </div>
+
+                    <p
+                      style={{
+                        color: "#76551b",
+                        fontSize: 12,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      Generated by PulseTrack when this project was created.
+                      Copy it now and save it securely. It authenticates
+                      server-side events. Never expose it in browser code,
+                      source control, or public logs.
+                    </p>
+                  </>
+                ) : (
+                  <div
+                    role="alert"
+                    style={{
+                      padding: 14,
+                      borderRadius: 10,
+                      background: "#fff8e8",
+                      border: "1px solid #f3dfad",
+                      color: "#76551b",
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    The server secret was not returned by the API. For
+                    security, it cannot be recovered from its stored hash.
+                    Implement a server-key rotation endpoint to generate a
+                    replacement before using server-side tracking.
+                  </div>
+                )}
+              </section>
 
               <CodeSection
-                title="3. Configure your .env file"
+                title="3. Configure your backend .env file"
                 code={laravelEnv}
                 label="laravel-env"
-                note="Replace YOUR_API_ENDPOINT with your API base URL and YOUR_GENERATED_SECRET_KEY with the generated key. Add these lines to your Laravel application's .env file, not to the terminal."
+                note="Copy these settings into your Laravel application's .env file. Replace YOUR_API_ENDPOINT with your PulseTrack API base URL. Keep the server key in the backend only."
               />
 
               <CodeSection
                 title="4. Track a server-side event"
                 code={laravelEvent}
                 label="laravel-event"
-                note="Example only. Adapt it to your controller and avoid tracking the same event twice."
+                note="Call this after the order has actually been created. Adapt the example to your application and avoid tracking the same event from both browser and server."
               />
 
               <section
                 style={{
                   padding: 14,
                   borderRadius: 10,
-                  background: "#fff8e8",
-                  border: "1px solid #f3dfad",
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
                 }}
               >
                 <h3 style={{ fontSize: 14, marginTop: 0 }}>
-                  Important: API authentication
+                  Server-side authentication
                 </h3>
+
                 <p
                   style={{
                     marginBottom: 0,
                     fontSize: 13,
                     lineHeight: 1.7,
-                    color: "#76551b",
+                    color: "#166534",
                   }}
                 >
-                  Generating a key does not register it with PulseTrack.
-                  The API must securely validate the Bearer server key and
-                  associate it with the correct project before accepting
-                  server-side events. Verify this is implemented before
-                  using the SDK in production.
+                  The Laravel SDK sends the server key as a Bearer token.
+                  PulseTrack must validate it against the project's stored
+                  server-key hash before accepting server events. Browser
+                  events use the public key and do not need this secret.
                 </p>
               </section>
             </>

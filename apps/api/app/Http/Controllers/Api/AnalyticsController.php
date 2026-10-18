@@ -16,7 +16,7 @@ class AnalyticsController extends Controller
     private function authorizeProject(Request $request): ?Project
     {
         $admin = $request->user();
-        $publicKey = $request->query('project_key');
+        $publicKey = $request->query('public_key');
 
         if (
             !$admin instanceof Admin ||

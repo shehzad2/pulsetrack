@@ -195,7 +195,7 @@ export class PulseTrack {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            project_key: this.projectKey,
+            public_key: this.projectKey,
             ...event,
           }),
         }

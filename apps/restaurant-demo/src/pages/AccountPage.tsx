@@ -9,7 +9,9 @@ import {
 } from "../auth";
 import type { AuthUser } from "../auth";
 
-const API_URL = "http://127.0.0.1:8000/api/v1";
+import { PULSETRACK_CONFIG } from "../config";
+
+const API_URL = `${PULSETRACK_CONFIG.endpoint}/api/v1`;
 
 interface TrackingEvent {
   id: number;

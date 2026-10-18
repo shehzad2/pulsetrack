@@ -20,6 +20,11 @@ class OrderController extends Controller
     {
         // Validate checkout and delivery details.
         $data = $request->validate([
+            'public_key' => [
+                    'required',
+                    'string',
+                    'exists:projects,public_key',
+                ],
             'customer_name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:30'],
             'address' => ['required', 'string', 'max:1000'],
@@ -43,11 +48,10 @@ class OrderController extends Controller
         ]);
 
         // Find the analytics project.
-        $projectKey = config('app.pulsetrack_public_key')
-            ?: env('PULSETRACK_PUBLIC_KEY');
-
-        $project = Project::where('public_key', $projectKey)
-            ->firstOrFail();
+      $project = Project::where(
+                'public_key',
+                $data['public_key']
+            )->firstOrFail();
 
         /*
          * Resolve an optional Sanctum bearer token.

@@ -1,8 +1,9 @@
+
 <?php
 
 return [
     'endpoint' => env('PULSETRACK_ENDPOINT', 'http://127.0.0.1:8000'),
-    'project_key' => env('PULSETRACK_PROJECT_KEY'),
+    'public_key' => env('PULSETRACK_PUBLIC_KEY'),
     'server_key' => env('PULSETRACK_SERVER_KEY'),
     'timeout' => (int) env('PULSETRACK_TIMEOUT', 5),
 

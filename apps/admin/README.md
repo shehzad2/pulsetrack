@@ -1,75 +1,63 @@
-# React + TypeScript + Vite
+# PulseTrack Admin Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The PulseTrack Admin Dashboard is a React application for viewing website analytics collected by the PulseTrack API. It provides the interface for monitoring website activity, visitor metrics, popular pages, event trends, and other available analytics.
 
-Currently, two official plugins are available:
+## Technology Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React
+- TypeScript
+- Vite
+- ESLint
+- PulseTrack Laravel API
 
-## React Compiler
+## Requirements
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js and npm compatible with the project dependencies
+- A running PulseTrack API
+- A valid admin account
+- A configured API endpoint
 
-## Expanding the ESLint configuration
+## Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+From the repository root:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+cd apps/admin
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Configuration
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Configure the API endpoint using the environment variable or configuration mechanism implemented by the admin application.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+For example, if the application uses Vite environment variables, it may use an `.env` file:
 
+```dotenv
+VITE_API_URL=http://127.0.0.1:8000
 ```
+
+Use the actual variable name expected by the application. Do not assume `VITE_API_URL` is supported until you confirm the configuration in the source code.
+
+Do not place server keys or other secret credentials in frontend environment variables. Vite exposes variables prefixed with `VITE_` to client-side code.
+
+## Development
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open the URL printed by Vite in your terminal.
+
+The development server supports Hot Module Replacement (HMR), allowing supported changes to appear without manually restarting the application.
+
+## Build for Production
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+The compiled files are

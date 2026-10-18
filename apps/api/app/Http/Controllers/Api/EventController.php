@@ -15,7 +15,7 @@ class EventController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'project_key' => ['required', 'string', 'max:100'],
+            'public_key' => ['required', 'string', 'max:100'],
             'event_id' => ['required', 'uuid'],
             'event_name' => [
                 'required',
@@ -39,7 +39,7 @@ class EventController extends Controller
 
         $data = $validator->validated();
 
-        $project = Project::where('public_key', $data['project_key'])
+        $project = Project::where('public_key', $data['public_key'])
             ->first();
 
         if (!$project) {
@@ -48,15 +48,18 @@ class EventController extends Controller
             ], 401);
         }
 
+        // Browser integration: public key only.
+        // Server integration: public key + Bearer server key.
         $serverKey = $request->bearerToken();
         $source = 'browser';
 
         if ($serverKey !== null) {
-            $storedHash = $project->server_key_hash;
+            $storedKey = $project->server_key_hash;
 
+            // Validate the server key only for server integration.
             if (
-                !$storedHash ||
-                !hash_equals($storedHash, hash('sha256', $serverKey))
+                empty($storedKey) ||
+                !hash_equals($storedKey, $serverKey)
             ) {
                 return response()->json([
                     'message' => 'Invalid server key',

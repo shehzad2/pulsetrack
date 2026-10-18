@@ -35,7 +35,7 @@ class RestaurantCheckoutController extends Controller
             'city' => ['required', 'string', 'max:100'],
             'postal_code' => ['required', 'string', 'max:20'],
             'payment_method' => ['required', 'in:cod'],
-
+            
             'items' => ['required', 'array', 'min:1', 'max:20'],
             'items.*.product_id' => [
                 'required',
