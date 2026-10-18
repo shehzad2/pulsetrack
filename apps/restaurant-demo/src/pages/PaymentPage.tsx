@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 
 interface PaymentNavigationState {
   orderId?: number | string;
@@ -56,7 +57,7 @@ export default function PaymentPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const state = (location.state ?? {}) as PaymentNavigationState;
-
+  const { clearCart } = useCart();
   const [method, setMethod] = useState<PaymentMethod>("cod");
   const [message, setMessage] = useState("");
 
@@ -87,7 +88,7 @@ export default function PaymentPage() {
       setMessage("Please select Cash on Delivery to continue.");
       return;
     }
-
+    clearCart();
     navigate(`/thank-you/${orderId}`, {
       state: {
         ...state,
