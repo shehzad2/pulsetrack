@@ -124,7 +124,7 @@ return [
     ],
 
     'pulsetrack_public_key' => env('PULSETRACK_PUBLIC_KEY'),
+    'pulsetrack_server_key' => env('PULSETRACK_SERVER_KEY'),
     'pulsetrack_admin_email' => env('PULSETRACK_ADMIN_EMAIL'),
     'pulsetrack_admin_password' => env('PULSETRACK_ADMIN_PASSWORD'),
-
 ];
