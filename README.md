@@ -1,6 +1,6 @@
 # PulseTrack
 
-PulseTrack is a lightweight analytics platform for tracking website activity and server-side business events. The monorepo contains the Laravel API, React admin dashboard, browser SDK, PHP server SDK, and Restaurant Demo application.
+PulseTrack is a lightweight analytics platform for tracking website activity and server-side business events. The monorepo contains a Laravel API, React admin dashboard, Browser SDK, PHP Server SDK, and Restaurant Demo application.
 
 ## Project Structure
 
@@ -15,7 +15,6 @@ pulsetrack/
 │   └── server-sdk/          # PHP/Laravel server SDK
 ├── docs/
 │   └── API.md               # API documentation
-├── docker-compose.yml
 └── README.md
 ```
 
@@ -26,17 +25,16 @@ pulsetrack/
 - **Admin dashboard:** React, TypeScript, Vite
 - **Browser SDK:** TypeScript
 - **Server SDK:** PHP and Laravel HTTP client
-- **Infrastructure:** Docker Compose
 
 ## Requirements
 
 Install the following before starting:
 
 - Git
-- Docker Desktop
 - PHP 8.2 or later and required Laravel extensions
 - Composer
 - Node.js and npm
+- PostgreSQL
 
 ## 1. Clone the Repository
 
@@ -45,41 +43,61 @@ git clone https://github.com/shehzad2/pulsetrack.git
 cd pulsetrack
 ```
 
-## 2. Start PostgreSQL
+## 2. Configure PostgreSQL
 
-From the repository root:
+Install PostgreSQL locally and ensure its database service is running.
 
-```bash
-docker compose up -d postgres
-docker compose ps
+Create the PulseTrack database using `psql` or your preferred PostgreSQL client:
+
+```sql
+CREATE DATABASE pulsetrack;
 ```
 
-Confirm that the PostgreSQL container is running. The local configuration uses host port `5433`; check `docker-compose.yml` if your configuration differs.
+Configure the database connection in `apps/api/.env`:
 
-## 3. Configure the Laravel API
+```dotenv
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=pulsetrack
+DB_USERNAME=YOUR_DATABASE_USERNAME
+DB_PASSWORD=YOUR_DATABASE_PASSWORD
+```
+
+Replace the example username and password with your actual local PostgreSQL credentials.
+
+## 3. Install and Configure the Laravel API
+
+Navigate to the API directory:
 
 ```bash
 cd apps/api
 cp .env.example .env
 ```
 
-Configure the database connection in `apps/api/.env`. For the default local Docker setup, verify these values against `docker-compose.yml`:
+If `.env` already exists, do not overwrite your existing configuration. Update it manually instead.
 
-```dotenv
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5433
-DB_DATABASE=pulsetrack
-DB_USERNAME=YOUR_DATABASE_USERNAME
-DB_PASSWORD=YOUR_DATABASE_PASSWORD
-```
-
-Install PHP dependencies and generate the application key:
+Install PHP dependencies:
 
 ```bash
 composer install
+```
+
+Generate the Laravel application key:
+
+```bash
 php artisan key:generate
 ```
+
+Configure the PulseTrack project credentials in `apps/api/.env`:
+
+```dotenv
+PULSETRACK_PUBLIC_KEY=YOUR_PROJECT_PUBLIC_KEY
+PULSETRACK_SERVER_KEY=YOUR_PROJECT_SERVER_KEY
+PULSETRACK_ADMIN_EMAIL=your-admin@example.com
+```
+
+Use the appropriate credentials for your project. The server key must remain private.
 
 Run database migrations and seed the database:
 
@@ -88,13 +106,13 @@ php artisan migrate
 php artisan db:seed
 ```
 
-Start the API:
+Start the Laravel API:
 
 ```bash
 php artisan serve --host=127.0.0.1 --port=8000
 ```
 
-The API is now available at:
+The API base URL is:
 
 ```text
 http://127.0.0.1:8000
@@ -104,33 +122,19 @@ Keep this terminal running.
 
 ## 4. Start the Admin Dashboard
 
-Open a **new terminal** from the repository root:
+Open a new terminal from the repository root:
 
 ```bash
-cd apps/admin
+cd ~/Documents/pulsetrack/apps/admin
 npm install
 npm run dev
 ```
 
 Open the local URL printed by Vite.
 
-Configure the admin API URL using the environment variable expected by `apps/admin/src/api.ts`. Do not assume the variable name; use the one defined in the source code.
+Configure the admin API URL using the environment variable expected by `apps/admin/src/api.ts`. Check the source code before adding a new variable.
 
-## 5. Start the Restaurant Demo
-
-Open another terminal:
-
-```bash
-cd apps/restaurant-demo
-npm install
-npm run dev
-```
-
-Open the local URL printed by Vite.
-
-The Restaurant Demo uses the Laravel API for products, authentication, checkout, and order-related operations. Its analytics configuration must use the public key belonging to the Restaurant Demo project.
-
-## 6. Configure the PulseTrack PHP Server SDK
+## 5. Configure the PHP Server SDK
 
 The PHP Server SDK is located at:
 
@@ -138,9 +142,11 @@ The PHP Server SDK is located at:
 packages/server-sdk/
 ```
 
-### Install the local package
+It enables Laravel applications to send server-side analytics events to PulseTrack.
 
-The SDK is maintained inside this monorepo. In `apps/api/composer.json`, ensure the local path repository is configured under `repositories`:
+### 5.1 Configure the local Composer package
+
+In `apps/api/composer.json`, ensure the local SDK path repository is included in the existing `repositories` array:
 
 ```json
 {
@@ -152,19 +158,23 @@ The SDK is maintained inside this monorepo. In `apps/api/composer.json`, ensure 
 }
 ```
 
-Merge this entry into the existing `repositories` array rather than replacing existing entries.
+Merge this entry with any existing repository configuration.
 
-Then, from `apps/api`, install the package if it is not already configured:
+If the SDK is not already installed, run the following from `apps/api`:
 
 ```bash
 composer require "pulsetrack/server-sdk:*@dev"
 ```
 
-If the dependency is already present in `composer.json` and `composer.lock`, use `composer install` instead.
+If the dependency is already declared in `composer.json` and `composer.lock`, use:
 
-### Configure server credentials
+```bash
+composer install
+```
 
-Add the settings expected by `config/pulsetrack.php` to `apps/api/.env`:
+### 5.2 Configure the SDK
+
+Add these settings to `apps/api/.env` if they are not already present:
 
 ```dotenv
 PULSETRACK_ENDPOINT=http://127.0.0.1:8000
@@ -173,17 +183,31 @@ PULSETRACK_SERVER_KEY=YOUR_PROJECT_SERVER_KEY
 PULSETRACK_TIMEOUT=5
 ```
 
-Use the correct public and server keys for the project. Never expose `PULSETRACK_SERVER_KEY` in browser code.
+Ensure `config/pulsetrack.php` maps the variables to the configuration keys expected by the SDK:
 
-### Register and use the SDK
+- `endpoint`
+- `public_key`
+- `server_key`
+- `timeout`
 
-The Laravel service provider is:
+Clear the Laravel configuration cache after changing environment settings:
+
+```bash
+cd ~/Documents/pulsetrack/apps/api
+php artisan config:clear
+```
+
+### 5.3 Register the service provider
+
+The SDK service provider is:
 
 ```php
 PulseTrack\ServerSdk\PulseTrackServiceProvider
 ```
 
-Ensure it is registered through Composer auto-discovery or `apps/api/bootstrap/providers.php`, according to the existing project configuration.
+Ensure Laravel registers the provider through Composer package auto-discovery or `apps/api/bootstrap/providers.php`, according to the package configuration.
+
+### 5.4 Track a server-side event
 
 Inject the SDK into a Laravel controller or service:
 
@@ -212,11 +236,15 @@ class CheckoutController
 }
 ```
 
-This is an example. In the real checkout flow, send the event only after the order has been successfully saved. Replace the sample order values with actual order data.
+This is an illustrative example. In the actual checkout flow, send the event after the order has been successfully persisted and use real order data.
 
-For additional instructions, see [`packages/server-sdk/README.md`](packages/server-sdk/README.md).
+The API validates the server key and records accepted server-side events with `source = server`.
 
-## 7. Configure the Browser SDK
+See [PHP Server SDK documentation](packages/server-sdk/README.md).
+
+## 6. Configure the Browser SDK
+
+**Configure and build the Browser SDK before starting the Restaurant Demo.** The demo imports this package and cannot run correctly until the dependency is available.
 
 The Browser SDK is located at:
 
@@ -224,31 +252,33 @@ The Browser SDK is located at:
 packages/browser-sdk/
 ```
 
-### Build and test the SDK
+### 6.1 Build and test the SDK
 
 From the repository root:
 
 ```bash
-cd packages/browser-sdk
+cd ~/Documents/pulsetrack/packages/browser-sdk
 npm install
 npm run build
 npm test
 ```
 
-### Install it in the Restaurant Demo
+### 6.2 Install the SDK in the Restaurant Demo
 
-If the demo is configured to consume the package through a local file dependency:
+Open a new terminal:
 
 ```bash
-cd apps/restaurant-demo
+cd ~/Documents/pulsetrack/apps/restaurant-demo
 npm install ../../packages/browser-sdk
 ```
 
-If the dependency is already configured in `apps/restaurant-demo/package.json`, run `npm install` instead.
+If the package is already declared as a local dependency in `apps/restaurant-demo/package.json`, use `npm install` instead.
 
-### Configure the public project key
+Confirm that the SDK package name in `packages/browser-sdk/package.json` matches the import used by the demo, such as `@pulsetrack/browser-sdk`.
 
-Use the existing configuration file, such as `apps/restaurant-demo/src/config.ts`:
+### 6.3 Configure the public project key
+
+Configure `apps/restaurant-demo/src/config.ts` with the public key for the Restaurant Demo project:
 
 ```typescript
 export const PULSETRACK_CONFIG = {
@@ -257,11 +287,11 @@ export const PULSETRACK_CONFIG = {
 };
 ```
 
-Use the public key associated with the Restaurant Demo project. Do not put a server key in the frontend.
+Use the actual public key assigned to the Restaurant Demo project. Never expose the server key in frontend code.
 
-### Initialize analytics
+### 6.4 Initialize analytics
 
-For example, in `apps/restaurant-demo/src/analytics.ts`:
+In `apps/restaurant-demo/src/analytics.ts`:
 
 ```typescript
 import { PulseTrack } from "@pulsetrack/browser-sdk";
@@ -274,7 +304,9 @@ export const analytics = new PulseTrack({
 });
 ```
 
-### Track a custom event
+### 6.5 Track a custom event
+
+Import the initialized analytics client where needed:
 
 ```typescript
 import { analytics } from "./analytics";
@@ -284,9 +316,40 @@ analytics.track("button_clicked", {
 });
 ```
 
-For additional features and configuration options, see [`packages/browser-sdk/README.md`](packages/browser-sdk/README.md).
+Use meaningful event names and non-sensitive properties. Do not send passwords, payment credentials, or other confidential data to analytics.
 
-## 8. Event Ingestion
+See [Browser SDK documentation](packages/browser-sdk/README.md) for additional features and configuration options.
+
+## 7. Start the Restaurant Demo
+
+Before starting the demo, ensure that:
+
+- PostgreSQL is running locally.
+- Laravel migrations and seeders have completed successfully.
+- The Laravel API is running at `http://127.0.0.1:8000`.
+- The Browser SDK has been built and installed in the demo.
+- The Browser SDK configuration contains the correct public project key.
+
+Open a new terminal:
+
+```bash
+cd ~/Documents/pulsetrack/apps/restaurant-demo
+npm run dev
+```
+
+Open the local URL printed by Vite.
+
+If port `5173` is already in use, Vite may select another port, such as `5174`. Use the URL shown in your terminal.
+
+### Verify browser analytics
+
+1. Open the Restaurant Demo in your browser.
+2. Open Developer Tools and select the Network tab.
+3. Look for requests to `POST /api/v1/events`.
+4. Confirm that the request contains the correct public project key.
+5. Check the API response and verify accepted events in the analytics data.
+
+## 8. Event Ingestion and Authentication
 
 The event-ingestion endpoint is:
 
@@ -295,25 +358,31 @@ POST /api/v1/events
 Content-Type: application/json
 ```
 
-Browser requests include the public project key in the event payload. Server requests also include the server key in the bearer authorization header.
+Browser requests include the public project key in the event payload. Server requests additionally include the server key in the bearer authorization header:
 
-| Integration | Authentication | Event source |
+```http
+Authorization: Bearer YOUR_PROJECT_SERVER_KEY
+```
+
+| Integration | Authentication | Expected event source |
 |---|---|---|
 | Browser SDK | Public project key | `browser` |
 | PHP Server SDK | Public project key and server bearer key | `server` |
 
-The API validates incoming events and associates them with the relevant project. Check [`docs/API.md`](docs/API.md) for the implemented routes, request parameters, response formats, and authentication requirements.
+The API validates incoming events and associates them with the relevant project. Requests without a bearer token are treated as browser events by the current ingestion implementation.
+
+See [API documentation](docs/API.md) for the implemented endpoints, parameters, response formats, and authentication requirements.
 
 ## 9. Run Tests and Build Applications
 
 ### Laravel API tests
 
 ```bash
-cd apps/api
+cd ~/Documents/pulsetrack/apps/api
 php artisan test
 ```
 
-To run the analytics tests separately:
+Run specific feature tests:
 
 ```bash
 php artisan test --filter=AnalyticsTest
@@ -323,21 +392,21 @@ php artisan test --filter=EventIngestionTest
 ### Admin dashboard
 
 ```bash
-cd apps/admin
+cd ~/Documents/pulsetrack/apps/admin
 npm run build
 ```
 
 ### Restaurant Demo
 
 ```bash
-cd apps/restaurant-demo
+cd ~/Documents/pulsetrack/apps/restaurant-demo
 npm run build
 ```
 
 ### Browser SDK
 
 ```bash
-cd packages/browser-sdk
+cd ~/Documents/pulsetrack/packages/browser-sdk
 npm run build
 npm test
 ```
@@ -346,42 +415,67 @@ npm test
 
 ### PostgreSQL connection errors
 
-- Check that the PostgreSQL container is running with `docker compose ps`.
-- Verify the port, database name, username, and password in `apps/api/.env`.
-- Confirm the database port matches `docker-compose.yml`.
+- Confirm that PostgreSQL is running locally.
+- Verify `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` in `apps/api/.env`.
+- For a local PostgreSQL installation using the default port, the port is usually `5432`.
+- The database must exist before running migrations.
 
-### Laravel configuration issues
+### Laravel configuration errors
 
 After changing environment variables, clear the configuration cache:
 
 ```bash
-cd apps/api
+cd ~/Documents/pulsetrack/apps/api
 php artisan config:clear
 ```
 
+If migrations or seeders fail, check the error message and verify the required environment variables.
+
+### Browser SDK dependency errors
+
+If Vite reports that `@pulsetrack/browser-sdk` cannot be resolved:
+
+```bash
+cd ~/Documents/pulsetrack/packages/browser-sdk
+npm install
+npm run build
+```
+
+Then install the local dependency in the Restaurant Demo:
+
+```bash
+cd ~/Documents/pulsetrack/apps/restaurant-demo
+npm install ../../packages/browser-sdk
+npm run dev
+```
+
+If the issue persists, verify that the package name in `packages/browser-sdk/package.json` matches the import in `src/analytics.ts`.
+
 ### Browser events are not appearing
 
-- Check that the API is running.
+- Confirm that the API is running.
 - Verify the Browser SDK endpoint and public project key.
-- Inspect browser Developer Tools → Network for `POST /api/v1/events`.
-- Check the API response and Laravel logs.
+- Inspect the Network tab for `POST /api/v1/events`.
+- Review the API response and Laravel logs.
 
 ### Server events are rejected
 
 - Verify the public project key and server key.
-- Confirm that the server key matches the project's configured credential.
-- Check the `Authorization: Bearer ...` header.
+- Confirm the server key matches the project's configured credential.
+- Check the bearer authorization header.
 - Never put server credentials in frontend configuration.
+
+### Vite port is already in use
+
+Vite may select another available port automatically. Open the URL printed in the terminal instead of assuming the application uses port `5173`.
 
 ## Security
 
 - Never commit `.env` files or real credentials.
 - Never expose server keys in browser applications.
-- Use HTTPS in production.
+- Use HTTPS for production API communication.
 - Rotate any server key that may have been exposed.
 - Avoid sending passwords, payment credentials, or sensitive personal data in analytics events.
 - Back up the database and review migrations before production deployment.
 
-## License
 
-See the repository's license file, if present.
