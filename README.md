@@ -43,28 +43,62 @@ git clone https://github.com/shehzad2/pulsetrack.git
 cd pulsetrack
 ```
 
-## 2. Configure PostgreSQL
+## 2: Run PostgreSQL with Docker Compose
 
-Install PostgreSQL locally and ensure its database service is running.
+Create a `compose.yaml` file in the repository root:
 
-Create the PulseTrack database using `psql` or your preferred PostgreSQL client:
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    container_name: pulsetrack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pulsetrack
+      POSTGRES_USER: pulsetrack
+      POSTGRES_PASSWORD: pulsetrack@123
+    ports:
+      - "5433:5432"
+    volumes:
+      - pulsetrack_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulsetrack -d pulsetrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-```sql
-CREATE DATABASE pulsetrack;
+volumes:
+  pulsetrack_pgdata:
 ```
 
-Configure the database connection in `apps/api/.env`:
+Start PostgreSQL:
+
+```bash
+docker compose up -d postgres
+```
+
+Check the container status:
+
+```bash
+docker compose ps
+docker compose logs postgres
+```
+
+Configure `apps/api/.env` to connect to the Docker PostgreSQL instance:
 
 ```dotenv
 DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
-DB_PORT=5432
+DB_PORT=5433
 DB_DATABASE=pulsetrack
-DB_USERNAME=YOUR_DATABASE_USERNAME
-DB_PASSWORD=YOUR_DATABASE_PASSWORD
+DB_USERNAME=pulsetrack
+DB_PASSWORD=pulsetrack@123
 ```
 
-Replace the example username and password with your actual local PostgreSQL credentials.
+Wait until PostgreSQL is healthy before running Laravel migrations.
+
+**Note:** The Docker port mapping `5433:5432` means PostgreSQL listens on port `5432` inside the container and is accessible on port `5433` from your host machine. If you use a locally installed PostgreSQL server instead, configure the appropriate port and credentials for that installation.
+
 
 ## 3. Install and Configure the Laravel API
 
