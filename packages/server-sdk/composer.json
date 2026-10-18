@@ -1,0 +1,23 @@
+{
+    "name": "pulsetrack/server-sdk",
+    "description": "PHP Laravel SDK for PulseTrack server-side analytics",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PulseTrack\\ServerSdk\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "PulseTrack\\ServerSdk\\PulseTrackServiceProvider"
+            ]
+        }
+    }
+}

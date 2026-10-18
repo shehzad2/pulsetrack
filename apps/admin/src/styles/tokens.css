@@ -1,0 +1,9 @@
+:root {
+  color-scheme: light;
+  --color-primary: #5869df;
+  --color-text: #202943;
+  --color-muted: #858da0;
+  --color-border: #eaecf3;
+  --color-background: #f6f7fb;
+  --radius-card: 13px;
+}
