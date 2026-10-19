@@ -37,7 +37,7 @@ class ProjectSeeder extends Seeder
             [
                 'admin_id' => $admin->id,
                 'name' => 'Restaurant Demo',
-                'server_key_hash' => hash('sha256', $serverKey),
+                'server_key_hash' => $serverKey,
             ]
         );
     }

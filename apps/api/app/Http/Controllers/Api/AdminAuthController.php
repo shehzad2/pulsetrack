@@ -126,7 +126,7 @@ class AdminAuthController extends Controller
         $project = $admin->projects()->create([
             'name' => $validated['name'],
             'public_key' => $publicKey,
-            'server_key_hash' => hash('sha256', $serverKey),
+            'server_key_hash' => $serverKey,
         ]);
 
         return response()->json([
@@ -194,7 +194,7 @@ class AdminAuthController extends Controller
 
         $serverKey = 'sk_' . bin2hex(random_bytes(32));
 
-        $project->server_key_hash = hash('sha256', $serverKey);
+        $project->server_key_hash = $serverKey;
         $project->save();
 
         return response()->json([
